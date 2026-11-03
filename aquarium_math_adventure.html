@@ -1,0 +1,1080 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>水族館三位數加法冒險 - SEN專用數學學習庫</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Canvas Confetti CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <!-- Google Font (Fredoka & Noto Sans TC) -->
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Noto+Sans+TC:wght@500;700;900&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        aqua: {
+                            50: '#f0fdfa',
+                            100: '#ccfbf1',
+                            200: '#99f6e4',
+                            500: '#14b8a6',
+                            700: '#0f766e',
+                            900: '#134e4a',
+                        },
+                        hundred: {
+                            light: '#ffe4e6',
+                            border: '#f43f5e',
+                            bg: '#fff1f2',
+                            text: '#be123c'
+                        },
+                        ten: {
+                            light: '#fef9c3',
+                            border: '#eab308',
+                            bg: '#fefce8',
+                            text: '#a16207'
+                        },
+                        one: {
+                            light: '#dbeafe',
+                            border: '#3b82f6',
+                            bg: '#eff6ff',
+                            text: '#1d4ed8'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Fredoka', 'Noto Sans TC', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            font-family: 'Fredoka', 'Noto Sans TC', sans-serif;
+            background: linear-gradient(180deg, #e0f2fe 0%, #bae6fd 50%, #7dd3fc 100%);
+            min-height: 100vh;
+            touch-action: manipulation;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* 水族館浮動氣泡背景效果 */
+        .bubble {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.4);
+            border-radius: 50%;
+            pointer-events: none;
+            animation: floatUp linear infinite;
+        }
+
+        @keyframes floatUp {
+            0% { transform: translateY(100vh) scale(0.5); opacity: 0; }
+            50% { opacity: 0.8; }
+            100% { transform: translateY(-10vh) scale(1.2); opacity: 0; }
+        }
+
+        /* 滿十進一動畫標籤 */
+        .carry-tag-anim {
+            position: absolute;
+            z-index: 50;
+            transition: all 0.9s cubic-bezier(0.34, 1.56, 0.64, 1);
+            animation: pulseGlow 0.6s infinite alternate;
+        }
+
+        @keyframes pulseGlow {
+            0% { transform: scale(1); box-shadow: 0 0 5px #f59e0b; }
+            100% { transform: scale(1.25); box-shadow: 0 0 20px #ef4444; }
+        }
+
+        /* 積木高亮與特效 */
+        .block-hundred {
+            background-color: #fda4af;
+            border: 2px solid #e11d48;
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            grid-template-rows: repeat(10, 1fr);
+            gap: 1px;
+            padding: 2px;
+        }
+        .block-hundred div { background: #fff1f2; border-radius: 1px; }
+
+        .block-ten {
+            background-color: #fde047;
+            border: 2px solid #ca8a04;
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+            padding: 2px;
+        }
+        .block-ten div { background: #fefce8; flex: 1; border-radius: 1px; }
+
+        .block-one {
+            background-color: #60a5fa;
+            border: 2px solid #2563eb;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        /* 呼吸提示效果 */
+        .active-column-highlight {
+            animation: activeColumnPulse 1.2s infinite alternate;
+        }
+
+        @keyframes activeColumnPulse {
+            0% { box-shadow: 0 0 0px 0px rgba(59, 130, 246, 0.5); border-width: 4px; }
+            100% { box-shadow: 0 0 25px 6px rgba(59, 130, 246, 0.9); border-width: 4px; }
+        }
+
+        /* 數字按鈕與輸入框 */
+        .num-btn {
+            transition: all 0.15s ease;
+        }
+        .num-btn:active {
+            transform: scale(0.92);
+        }
+
+        /* 滾動條客製 */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #38bdf8;
+            border-radius: 999px;
+        }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen text-slate-800 relative overflow-x-hidden">
+
+    <!-- 氣泡背景容器 -->
+    <div id="bubble-container" class="fixed inset-0 pointer-events-none z-0 overflow-hidden"></div>
+
+    <!-- 頂部導覽與控制列 -->
+    <header class="bg-white/80 backdrop-blur-md border-b-4 border-sky-300 px-4 py-3 sticky top-0 z-40 flex justify-between items-center shadow-md">
+        <div class="flex items-center gap-3">
+            <div class="bg-sky-500 text-white w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shadow-lg border-2 border-white">
+                <i class="fa-solid fa-fish-fins"></i>
+            </div>
+            <div>
+                <h1 class="text-xl md:text-2xl font-black text-sky-900 tracking-wide">水族館三位數加法冒險</h1>
+                <p class="text-xs text-sky-600 font-bold hidden sm:block">SEN 專屬視覺化與直式加法輔助小工具</p>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2 md:gap-3">
+            <!-- 語音朗讀開關 -->
+            <button id="btn-speech-toggle" onclick="toggleSpeech()" class="bg-amber-100 hover:bg-amber-200 text-amber-800 border-2 border-amber-400 p-2.5 rounded-2xl flex items-center gap-2 font-bold text-sm shadow transition">
+                <i id="icon-speech" class="fa-solid fa-volume-high text-lg"></i>
+                <span class="hidden md:inline">語音指導</span>
+            </button>
+
+            <!-- 音效開關 -->
+            <button id="btn-audio-toggle" onclick="toggleAudio()" class="bg-emerald-100 hover:bg-emerald-200 text-emerald-800 border-2 border-emerald-400 p-2.5 rounded-2xl flex items-center gap-2 font-bold text-sm shadow transition">
+                <i id="icon-audio" class="fa-solid fa-music text-lg"></i>
+                <span class="hidden md:inline">音效</span>
+            </button>
+
+            <!-- 水族館獎牌按鈕 -->
+            <button onclick="openMedalModal()" class="bg-pink-100 hover:bg-pink-200 text-pink-700 border-2 border-pink-400 px-3 py-2.5 rounded-2xl font-bold text-sm shadow flex items-center gap-2 transition">
+                <i class="fa-solid fa-trophy text-amber-500 text-lg"></i>
+                <span>獎牌包</span>
+                <span id="medal-count-badge" class="bg-pink-500 text-white text-xs px-2 py-0.5 rounded-full font-black">0/4</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- 主要遊戲區域 -->
+    <main class="flex-1 max-w-6xl w-full mx-auto p-3 md:p-6 z-10 flex flex-col gap-4">
+
+        <!-- 關卡選擇卡片 -->
+        <section class="bg-white/90 rounded-3xl p-4 shadow-xl border-4 border-white/60">
+            <div class="flex justify-between items-center mb-3">
+                <span class="text-xs font-black text-slate-400 uppercase tracking-wider"><i class="fa-solid fa-map-location-dot"></i> 冒險關卡選擇</span>
+                <span id="step-indicator" class="text-sm font-bold bg-sky-100 text-sky-800 px-3 py-1 rounded-full border border-sky-300">
+                    目前解題階段：1. 擺放積木
+                </span>
+            </div>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+                <button onclick="selectLevel(1)" id="lvl-btn-1" class="lvl-btn p-3 rounded-2xl border-4 text-left transition transform active:scale-95 flex flex-col gap-1 bg-sky-50 border-sky-400 text-sky-900 shadow">
+                    <span class="text-xs font-bold text-sky-600">關卡 1</span>
+                    <span class="font-black text-sm md:text-base">不進位預習</span>
+                    <span class="text-[10px] text-slate-500">例如: 612 + 201</span>
+                </button>
+
+                <button onclick="selectLevel(2)" id="lvl-btn-2" class="lvl-btn p-3 rounded-2xl border-4 text-left transition transform active:scale-95 flex flex-col gap-1 bg-slate-100 border-slate-300 text-slate-600 opacity-80">
+                    <span class="text-xs font-bold text-slate-500">關卡 2</span>
+                    <span class="font-black text-sm md:text-base">個位進十位</span>
+                    <span class="text-[10px] text-slate-400">例如: 158 + 42</span>
+                </button>
+
+                <button onclick="selectLevel(3)" id="lvl-btn-3" class="lvl-btn p-3 rounded-2xl border-4 text-left transition transform active:scale-95 flex flex-col gap-1 bg-slate-100 border-slate-300 text-slate-600 opacity-80">
+                    <span class="text-xs font-bold text-slate-500">關卡 3</span>
+                    <span class="font-black text-sm md:text-base">十位進百位/多重</span>
+                    <span class="text-[10px] text-slate-400">例如: 384 + 162</span>
+                </button>
+
+                <button onclick="selectLevel(4)" id="lvl-btn-4" class="lvl-btn p-3 rounded-2xl border-4 text-left transition transform active:scale-95 flex flex-col gap-1 bg-slate-100 border-slate-300 text-slate-600 opacity-80">
+                    <span class="text-xs font-bold text-slate-500">關卡 4</span>
+                    <span class="font-black text-sm md:text-base">橫式轉直式大考驗</span>
+                    <span class="text-[10px] text-slate-400">例如: 81 + 619</span>
+                </button>
+            </div>
+        </section>
+
+        <!-- 水族館情境與題目說明欄 -->
+        <section class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-3xl p-4 shadow-xl border-4 border-blue-300/40 relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-4">
+            <div class="flex items-center gap-4 z-10">
+                <div class="w-16 h-16 md:w-20 md:h-20 bg-white/20 rounded-2xl flex items-center justify-center text-3xl md:text-4xl shadow-inner border border-white/30 shrink-0">
+                    <span id="aquarium-icon">🐬</span>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span id="level-title-tag" class="bg-amber-400 text-amber-950 text-xs font-black px-2.5 py-0.5 rounded-full uppercase">關卡 1</span>
+                        <span class="text-xs text-blue-100 font-semibold">任務情境計算</span>
+                    </div>
+                    <h2 id="story-text" class="text-lg md:text-xl font-bold mt-1 text-blue-50">
+                        水族館上午有 612 人入場，下午又有 201 人。一共有多少人入場？
+                    </h2>
+                </div>
+            </div>
+
+            <!-- 橫式算式呈現 (關卡 4 特別突出) -->
+            <div class="bg-white/10 backdrop-blur-md px-5 py-3 rounded-2xl border border-white/20 text-center shrink-0 w-full md:w-auto">
+                <div class="text-xs text-blue-200 font-bold mb-1">橫式算式</div>
+                <div id="horizontal-equation" class="text-2xl md:text-3xl font-black tracking-wider text-amber-300">
+                    612 + 201 = ?
+                </div>
+            </div>
+        </section>
+
+        <!-- 核心操作區：數條積木擺放 + 直式對照 -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+
+            <!-- 左側：視覺化積木操作區域 (7 Cols) -->
+            <section class="lg:col-span-7 bg-white/95 rounded-3xl p-4 md:p-5 shadow-xl border-4 border-white/80 flex flex-col justify-between gap-4">
+                <div class="flex justify-between items-center border-b pb-3">
+                    <h3 class="font-black text-slate-700 text-lg flex items-center gap-2">
+                        <i class="fa-solid fa-shapes text-sky-500"></i>
+                        <span>數條與積木操作板</span>
+                    </h3>
+                    <div class="flex gap-2">
+                        <button onclick="autoFillBlocks()" class="bg-sky-100 hover:bg-sky-200 text-sky-700 border border-sky-300 px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1 transition">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> 一鍵排好積木
+                        </button>
+                        <button onclick="resetBlocks()" class="bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-300 px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1 transition">
+                            <i class="fa-solid fa-rotate-left"></i> 清空
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 點擊新增積木的工具箱 -->
+                <div class="bg-slate-50 p-3 rounded-2xl border-2 border-slate-200 flex justify-around items-center gap-2">
+                    <button onclick="addBlock('hundred')" class="flex-1 bg-hundred-bg hover:bg-hundred-light border-2 border-hundred-border p-2 rounded-xl text-hundred-text font-bold text-xs md:text-sm flex flex-col items-center gap-1 shadow-sm transition active:scale-95">
+                        <i class="fa-solid fa-square-full text-lg"></i>
+                        <span>+百位大塊 (100)</span>
+                    </button>
+                    <button onclick="addBlock('ten')" class="flex-1 bg-ten-bg hover:bg-ten-light border-2 border-ten-border p-2 rounded-xl text-ten-text font-bold text-xs md:text-sm flex flex-col items-center gap-1 shadow-sm transition active:scale-95">
+                        <i class="fa-solid fa-bars text-lg"></i>
+                        <span>+十位長條 (10)</span>
+                    </button>
+                    <button onclick="addBlock('one')" class="flex-1 bg-one-bg hover:bg-one-light border-2 border-one-border p-2 rounded-xl text-one-text font-bold text-xs md:text-sm flex flex-col items-center gap-1 shadow-sm transition active:scale-95">
+                        <i class="fa-solid fa-cube text-lg"></i>
+                        <span>+個位小塊 (1)</span>
+                    </button>
+                </div>
+
+                <!-- 三個欄位的積木置放放置區 (Drop Zones) -->
+                <div class="grid grid-cols-3 gap-2.5 md:gap-3 flex-1 min-h-[300px]">
+
+                    <!-- 百位放置區 (粉紅) -->
+                    <div id="drop-hundred" 
+                         ondragover="allowDrop(event)" 
+                         ondrop="handleDrop(event, 'hundred')"
+                         class="bg-hundred-bg border-4 border-hundred-border/40 rounded-2xl p-2.5 flex flex-col items-center justify-start gap-2 relative transition-all">
+                        <div class="bg-hundred-border text-white text-xs md:text-sm font-black px-3 py-1 rounded-full shadow-sm w-full text-center">
+                            百位 (粉紅 100)
+                        </div>
+                        <div id="container-hundred" class="w-full flex-1 flex flex-wrap gap-1.5 justify-center items-start content-start overflow-y-auto p-1 max-h-[260px]">
+                            <!-- 積木放這裡 -->
+                        </div>
+                        <span id="count-hundred" class="text-xs font-bold text-hundred-text bg-white px-2.5 py-0.5 rounded-full border border-hundred-border shadow-sm">0 個</span>
+                    </div>
+
+                    <!-- 十位放置區 (黃) -->
+                    <div id="drop-ten" 
+                         ondragover="allowDrop(event)" 
+                         ondrop="handleDrop(event, 'ten')"
+                         class="bg-ten-bg border-4 border-ten-border/40 rounded-2xl p-2.5 flex flex-col items-center justify-start gap-2 relative transition-all">
+                        <div class="bg-ten-border text-white text-xs md:text-sm font-black px-3 py-1 rounded-full shadow-sm w-full text-center">
+                            十位 (黃條 10)
+                        </div>
+                        <div id="container-ten" class="w-full flex-1 flex flex-wrap gap-1.5 justify-center items-start content-start overflow-y-auto p-1 max-h-[260px]">
+                            <!-- 積木放這裡 -->
+                        </div>
+                        <span id="count-ten" class="text-xs font-bold text-ten-text bg-white px-2.5 py-0.5 rounded-full border border-ten-border shadow-sm">0 個</span>
+                    </div>
+
+                    <!-- 個位放置區 (藍) -->
+                    <div id="drop-one" 
+                         ondragover="allowDrop(event)" 
+                         ondrop="handleDrop(event, 'one')"
+                         class="bg-one-bg border-4 border-one-border/40 rounded-2xl p-2.5 flex flex-col items-center justify-start gap-2 relative transition-all">
+                        <div class="bg-one-border text-white text-xs md:text-sm font-black px-3 py-1 rounded-full shadow-sm w-full text-center">
+                            個位 (藍塊 1)
+                        </div>
+                        <div id="container-one" class="w-full flex-1 flex flex-wrap gap-1.5 justify-center items-start content-start overflow-y-auto p-1 max-h-[260px]">
+                            <!-- 積木放這裡 -->
+                        </div>
+                        <span id="count-one" class="text-xs font-bold text-one-text bg-white px-2.5 py-0.5 rounded-full border border-one-border shadow-sm">0 個</span>
+                    </div>
+
+                </div>
+
+                <div class="text-center text-xs text-slate-500 font-bold bg-amber-50 p-2.5 rounded-xl border border-amber-200 text-amber-800">
+                    <i class="fa-solid fa-lightbulb text-amber-500 mr-1"></i>
+                    操作提示：點擊上方按鈕可以增加積木，點擊欄位內的積木可以將它移除喔！
+                </div>
+            </section>
+
+            <!-- 右側：三位數直式與分步計算對照區 (5 Cols) -->
+            <section class="lg:col-span-5 bg-white/95 rounded-3xl p-4 md:p-5 shadow-xl border-4 border-white/80 flex flex-col justify-between gap-4">
+                <div class="flex justify-between items-center border-b pb-3">
+                    <h3 class="font-black text-slate-700 text-lg flex items-center gap-2">
+                        <i class="fa-solid fa-calculator text-indigo-500"></i>
+                        <span>直式加法對照</span>
+                    </h3>
+                    <button onclick="giveHint()" class="bg-amber-400 hover:bg-amber-500 text-amber-950 font-black px-3 py-1.5 rounded-xl text-xs flex items-center gap-1 shadow-md transition active:scale-95">
+                        <i class="fa-solid fa-circle-question"></i> 提示 Hint
+                    </button>
+                </div>
+
+                <!-- 直式計算框架 (彩色三欄對齊) -->
+                <div class="relative bg-slate-50 p-4 rounded-2xl border-2 border-slate-200">
+                    
+                    <!-- 欄位表頭提示 -->
+                    <div class="grid grid-cols-4 text-center font-black text-sm mb-2">
+                        <div class="text-slate-400">運算</div>
+                        <div class="text-hundred-text bg-hundred-light/60 py-1 rounded-t-xl border-b-2 border-hundred-border">百位</div>
+                        <div class="text-ten-text bg-ten-light/60 py-1 rounded-t-xl border-b-2 border-ten-border">十位</div>
+                        <div class="text-one-text bg-one-light/60 py-1 rounded-t-xl border-b-2 border-one-border">個位</div>
+                    </div>
+
+                    <!-- 進位標籤動態列 (Carry Row) -->
+                    <div class="grid grid-cols-4 text-center font-bold mb-1 h-9 items-center">
+                        <div class="text-xs text-slate-400">進位</div>
+                        <!-- 百位頂部進位 -->
+                        <div id="carry-hundred-box" class="flex justify-center items-center">
+                            <span id="carry-hundred-tag" class="hidden bg-rose-500 text-white font-black text-xs px-2 py-0.5 rounded-full border-2 border-white shadow-md animate-bounce">
+                                +1
+                            </span>
+                        </div>
+                        <!-- 十位頂部進位 -->
+                        <div id="carry-ten-box" class="flex justify-center items-center">
+                            <span id="carry-ten-tag" class="hidden bg-amber-500 text-white font-black text-xs px-2 py-0.5 rounded-full border-2 border-white shadow-md animate-bounce">
+                                +1
+                            </span>
+                        </div>
+                        <!-- 個位不需要頂部進位 -->
+                        <div></div>
+                    </div>
+
+                    <!-- 第一個數 (被加數) -->
+                    <div class="grid grid-cols-4 text-center text-2xl md:text-3xl font-black py-2 items-center border-b border-slate-200">
+                        <div class="text-slate-300 text-lg"> </div>
+                        <div id="num1-hundred" class="text-hundred-text">6</div>
+                        <div id="num1-ten" class="text-ten-text">1</div>
+                        <div id="num1-one" class="text-one-text">2</div>
+                    </div>
+
+                    <!-- 第二個數 (加數) -->
+                    <div class="grid grid-cols-4 text-center text-2xl md:text-3xl font-black py-2 items-center">
+                        <div class="text-3xl font-black text-indigo-600 flex justify-center items-center">+</div>
+                        <div id="num2-hundred" class="text-hundred-text">2</div>
+                        <div id="num2-ten" class="text-ten-text">0</div>
+                        <div id="num2-one" class="text-one-text">1</div>
+                    </div>
+
+                    <!-- 直式底線 -->
+                    <div class="border-b-4 border-slate-800 my-1 rounded-full"></div>
+
+                    <!-- 答案填答列 (分步計算高亮) -->
+                    <div class="grid grid-cols-4 text-center py-2 items-center gap-1.5">
+                        <div class="text-xs font-bold text-slate-400">答案</div>
+                        
+                        <!-- 百位答案輸入 -->
+                        <div id="col-ans-hundred" class="col-box p-1 rounded-xl transition-all">
+                            <input type="number" id="ans-hundred" min="0" max="9" placeholder="?" 
+                                   class="w-full text-center text-2xl md:text-3xl font-black bg-white border-2 border-hundred-border text-hundred-text rounded-xl focus:outline-none focus:ring-4 focus:ring-rose-300 py-1"
+                                   disabled readonly onclick="handleInputFocus('hundred')">
+                        </div>
+
+                        <!-- 十位答案輸入 -->
+                        <div id="col-ans-ten" class="col-box p-1 rounded-xl transition-all">
+                            <input type="number" id="ans-ten" min="0" max="9" placeholder="?" 
+                                   class="w-full text-center text-2xl md:text-3xl font-black bg-white border-2 border-ten-border text-ten-text rounded-xl focus:outline-none focus:ring-4 focus:ring-amber-300 py-1"
+                                   disabled readonly onclick="handleInputFocus('ten')">
+                        </div>
+
+                        <!-- 個位答案輸入 (預設先算) -->
+                        <div id="col-ans-one" class="col-box p-1 rounded-xl transition-all active-column-highlight">
+                            <input type="number" id="ans-one" min="0" max="9" placeholder="?" 
+                                   class="w-full text-center text-2xl md:text-3xl font-black bg-white border-2 border-one-border text-one-text rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-300 py-1"
+                                   readonly onclick="handleInputFocus('one')">
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- SEN 友善特大數字鍵盤 -->
+                <div class="bg-slate-100 p-3 rounded-2xl border-2 border-slate-200">
+                    <div class="text-xs font-black text-slate-500 mb-2 flex justify-between items-center">
+                        <span><i class="fa-solid fa-keyboard mr-1"></i> 請點擊數字按鈕填入答案：</span>
+                        <span id="current-target-text" class="text-blue-600 font-bold bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">正在計算：個位</span>
+                    </div>
+
+                    <div class="grid grid-cols-5 gap-2 mb-2">
+                        <button onclick="pressNum(1)" class="num-btn bg-white hover:bg-slate-50 border-2 border-slate-300 text-slate-800 font-black text-xl py-3 rounded-xl shadow">1</button>
+                        <button onclick="pressNum(2)" class="num-btn bg-white hover:bg-slate-50 border-2 border-slate-300 text-slate-800 font-black text-xl py-3 rounded-xl shadow">2</button>
+                        <button onclick="pressNum(3)" class="num-btn bg-white hover:bg-slate-50 border-2 border-slate-300 text-slate-800 font-black text-xl py-3 rounded-xl shadow">3</button>
+                        <button onclick="pressNum(4)" class="num-btn bg-white hover:bg-slate-50 border-2 border-slate-300 text-slate-800 font-black text-xl py-3 rounded-xl shadow">4</button>
+                        <button onclick="pressNum(5)" class="num-btn bg-white hover:bg-slate-50 border-2 border-slate-300 text-slate-800 font-black text-xl py-3 rounded-xl shadow">5</button>
+                    </div>
+                    <div class="grid grid-cols-5 gap-2">
+                        <button onclick="pressNum(6)" class="num-btn bg-white hover:bg-slate-50 border-2 border-slate-300 text-slate-800 font-black text-xl py-3 rounded-xl shadow">6</button>
+                        <button onclick="pressNum(7)" class="num-btn bg-white hover:bg-slate-50 border-2 border-slate-300 text-slate-800 font-black text-xl py-3 rounded-xl shadow">7</button>
+                        <button onclick="pressNum(8)" class="num-btn bg-white hover:bg-slate-50 border-2 border-slate-300 text-slate-800 font-black text-xl py-3 rounded-xl shadow">8</button>
+                        <button onclick="pressNum(9)" class="num-btn bg-white hover:bg-slate-50 border-2 border-slate-300 text-slate-800 font-black text-xl py-3 rounded-xl shadow">9</button>
+                        <button onclick="pressNum(0)" class="num-btn bg-white hover:bg-slate-50 border-2 border-slate-300 text-slate-800 font-black text-xl py-3 rounded-xl shadow">0</button>
+                    </div>
+
+                    <div class="flex gap-2 mt-2">
+                        <button onclick="clearCurrentInput()" class="flex-1 bg-rose-100 hover:bg-rose-200 text-rose-700 font-bold border border-rose-300 py-2.5 rounded-xl text-sm transition">
+                            <i class="fa-solid fa-erase"></i> 清除
+                        </button>
+                        <button onclick="verifyStep()" class="flex-2 bg-emerald-500 hover:bg-emerald-600 text-white font-black border-b-4 border-emerald-700 py-2.5 px-6 rounded-xl text-base shadow-lg transition active:scale-95 flex items-center justify-center gap-2">
+                            <span>驗證此步驟</span>
+                            <i class="fa-solid fa-circle-check text-lg"></i>
+                        </button>
+                    </div>
+                </div>
+
+            </section>
+        </div>
+
+        <!-- 運算步驟與溫和反饋導航 -->
+        <footer class="bg-white/90 rounded-2xl p-4 shadow-lg border-2 border-white flex flex-col md:flex-row justify-between items-center gap-3">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-amber-400 text-amber-950 rounded-full flex items-center justify-center text-xl font-black shrink-0">
+                    <i class="fa-solid fa-compass"></i>
+                </div>
+                <div>
+                    <div class="text-xs font-bold text-slate-400">計算口訣指導</div>
+                    <div id="feedback-message" class="text-sm md:text-base font-bold text-slate-700">
+                        記得計算順序要「先計個位，再計十位，最後計百位」喔！
+                    </div>
+                </div>
+            </div>
+
+            <button onclick="nextQuestion()" class="w-full md:w-auto bg-sky-500 hover:bg-sky-600 text-white font-black px-6 py-3 rounded-2xl shadow-lg border-b-4 border-sky-700 flex items-center justify-center gap-2 transition transform active:scale-95">
+                <span>下一題水族館任務</span>
+                <i class="fa-solid fa-arrow-right"></i>
+            </button>
+        </footer>
+
+    </main>
+
+    <!-- 獎牌集郵對話框 Modal -->
+    <div id="medal-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border-4 border-pink-300 transform transition-all scale-100 flex flex-col gap-4">
+            <div class="flex justify-between items-center border-b pb-3">
+                <h3 class="text-xl font-black text-slate-800 flex items-center gap-2">
+                    <i class="fa-solid fa-award text-amber-500"></i>
+                    <span>水族館冒險榮譽榜</span>
+                </h3>
+                <button onclick="closeMedalModal()" class="text-slate-400 hover:text-slate-600 text-2xl font-bold">&times;</button>
+            </div>
+
+            <p class="text-sm text-slate-600 font-semibold">完成每個關卡的所有題目，即可解鎖可愛的水族館生物勳章！</p>
+
+            <div class="grid grid-cols-2 gap-3">
+                <!-- 勳章 1 -->
+                <div id="medal-card-1" class="p-3 rounded-2xl border-2 border-slate-200 bg-slate-50 flex flex-col items-center opacity-40">
+                    <div class="text-4xl mb-1">🐬</div>
+                    <div class="font-black text-xs text-slate-700">小海豚勳章</div>
+                    <div class="text-[10px] text-slate-400 mt-1">關卡 1：不進位</div>
+                </div>
+
+                <!-- 勳章 2 -->
+                <div id="medal-card-2" class="p-3 rounded-2xl border-2 border-slate-200 bg-slate-50 flex flex-col items-center opacity-40">
+                    <div class="text-4xl mb-1">🐠</div>
+                    <div class="font-black text-xs text-slate-700">熱帶魚勳章</div>
+                    <div class="text-[10px] text-slate-400 mt-1">關卡 2：個位進位</div>
+                </div>
+
+                <!-- 勳章 3 -->
+                <div id="medal-card-3" class="p-3 rounded-2xl border-2 border-slate-200 bg-slate-50 flex flex-col items-center opacity-40">
+                    <div class="text-4xl mb-1">🐙</div>
+                    <div class="font-black text-xs text-slate-700">章魚大師勳章</div>
+                    <div class="text-[10px] text-slate-400 mt-1">關卡 3：十位/多重</div>
+                </div>
+
+                <!-- 勳章 4 -->
+                <div id="medal-card-4" class="p-3 rounded-2xl border-2 border-slate-200 bg-slate-50 flex flex-col items-center opacity-40">
+                    <div class="text-4xl mb-1">👑</div>
+                    <div class="font-black text-xs text-slate-700">水族館王者勳章</div>
+                    <div class="text-[10px] text-slate-400 mt-1">關卡 4：綜合大考驗</div>
+                </div>
+            </div>
+
+            <button onclick="closeMedalModal()" class="w-full bg-slate-800 text-white font-bold py-2.5 rounded-xl text-sm">
+                關閉並繼續挑戰
+            </button>
+        </div>
+    </div>
+
+    <!-- 腳本邏輯 -->
+    <script>
+        /* ------------------------------------------------------------------
+         * 1. 遊戲資料庫與關卡定義 (關卡 1 ~ 4)
+         * ------------------------------------------------------------------ */
+        const gameLevels = {
+            1: {
+                name: '關卡 1：不進位預習',
+                badge: '🐬',
+                questions: [
+                    { num1: 612, num2: 201, story: '水族館上午有 612 人入場，下午又有 201 人。一共有多少人入場？' },
+                    { num1: 302, num2: 322, story: '大水槽有 302 條小藍魚與 322 條黃魚，共有多少條魚？' },
+                    { num1: 415, num2: 153, story: '海豚劇場賣出 415 張學生票與 153 張成人票，共賣出幾張票？' }
+                ]
+            },
+            2: {
+                name: '關卡 2：個位進十位冒險',
+                badge: '🐠',
+                questions: [
+                    { num1: 158, num2: 42, story: '企鵝館早上進入 158 位遊客，下午進入 42 位遊客。共有多少位？' },
+                    { num1: 247, num2: 135, story: '水母館有 247 隻大水母與 135 隻小水母，合共有多少隻水母？' },
+                    { num1: 526, num2: 264, story: '禮品店售出 526 個海豚公仔與 264 個企鵝公仔，共售出多少個？' }
+                ]
+            },
+            3: {
+                name: '關卡 3：進位挑戰 (十位/多重)',
+                badge: '🐙',
+                questions: [
+                    { num1: 384, num2: 162, story: '珊瑚礁區有 384 顆紫珊瑚與 162 顆綠珊瑚，共有多少顆珊瑚？' },
+                    { num1: 482, num2: 309, story: '海龜池餵食了 482 隻小龜與 309 隻大龜，一共餵食了幾隻龜？' },
+                    { num1: 48, num2: 154, story: '飼養員拿了 48 桶小魚與 154 桶大魚餵食海獅，共有幾桶？' }
+                ]
+            },
+            4: {
+                name: '關卡 4：綜合大考驗 (橫式轉直式)',
+                badge: '👑',
+                questions: [
+                    { num1: 81, num2: 619, story: '【橫式任務】請將 81 + 619 寫成直式並計算出總和！' },
+                    { num1: 76, num2: 847, story: '【橫式任務】請計算水族館門票總收入：76 + 847 = ？' },
+                    { num1: 259, num2: 383, story: '【終極任務】挑戰雙重進位：259 + 383 = ？' }
+                ]
+            }
+        };
+
+        // 當前遊戲狀態 Variables
+        let currentLevel = 1;
+        let currentQuestionIdx = 0;
+        let currentNum1 = 612;
+        let currentNum2 = 201;
+
+        // 計算步驟狀態: 'one' (個位), 'ten' (十位), 'hundred' (百位), 'completed'
+        let currentStep = 'one'; 
+        let carryFromOne = 0;   // 個位進十位 (0 或 1)
+        let carryFromTen = 0;   // 十位進百位 (0 或 1)
+
+        // 積木數量記錄
+        let userBlocks = { hundred: 0, ten: 0, one: 0 };
+
+        // 聲光設定
+        let audioEnabled = true;
+        let speechEnabled = true;
+
+        // 獎章獲得紀錄
+        let unlockedMedals = [false, false, false, false];
+
+        /* ------------------------------------------------------------------
+         * 2. 音效與語音系統 (Web Audio API & Web Speech API)
+         * ------------------------------------------------------------------ */
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        // 播放合成音效
+        function playTone(freq, type = 'sine', duration = 0.15) {
+            if (!audioEnabled) return;
+            try {
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + duration);
+            } catch (e) { console.log(e); }
+        }
+
+        function playSound(name) {
+            if (!audioEnabled) return;
+            if (name === 'pop') {
+                playTone(400, 'sine', 0.08);
+            } else if (name === 'correct') {
+                playTone(523.25, 'triangle', 0.12); // C5
+                setTimeout(() => playTone(659.25, 'triangle', 0.12), 100); // E5
+                setTimeout(() => playTone(783.99, 'triangle', 0.25), 200); // G5
+            } else if (name === 'carry') {
+                playTone(300, 'sawtooth', 0.1);
+                setTimeout(() => playTone(600, 'sawtooth', 0.2), 100);
+            } else if (name === 'wrong') {
+                playTone(220, 'square', 0.2);
+            } else if (name === 'win') {
+                confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+                playTone(523.25, 'sine', 0.15);
+                setTimeout(() => playTone(659.25, 'sine', 0.15), 150);
+                setTimeout(() => playTone(783.99, 'sine', 0.15), 300);
+                setTimeout(() => playTone(1046.50, 'sine', 0.4), 450);
+            }
+        }
+
+        // Web Speech 語音提示
+        function speak(text) {
+            if (!speechEnabled || !('speechSynthesis' in window)) return;
+            window.speechSynthesis.cancel(); // 停止先前的朗讀
+            const msg = new SpeechSynthesisUtterance(text);
+            msg.lang = 'zh-TW';
+            msg.rate = 0.9; // 稍微放慢語速適合 SEN
+            window.speechSynthesis.speak(msg);
+        }
+
+        function toggleAudio() {
+            audioEnabled = !audioEnabled;
+            document.getElementById('icon-audio').className = audioEnabled ? 'fa-solid fa-music text-lg' : 'fa-solid fa-volume-xmark text-lg';
+            document.getElementById('btn-audio-toggle').classList.toggle('opacity-50', !audioEnabled);
+        }
+
+        function toggleSpeech() {
+            speechEnabled = !speechEnabled;
+            document.getElementById('icon-speech').className = speechEnabled ? 'fa-solid fa-volume-high text-lg' : 'fa-solid fa-volume-xmark text-lg';
+            document.getElementById('btn-speech-toggle').classList.toggle('opacity-50', !speechEnabled);
+            if(speechEnabled) speak("語音指導已開啟");
+        }
+
+        /* ------------------------------------------------------------------
+         * 3. 遊戲初始化與關卡載入
+         * ------------------------------------------------------------------ */
+        window.onload = function() {
+            createBubbles();
+            selectLevel(1);
+        };
+
+        // 水族館背景氣泡產生器
+        function createBubbles() {
+            const container = document.getElementById('bubble-container');
+            for (let i = 0; i < 15; i++) {
+                const bubble = document.createElement('div');
+                bubble.className = 'bubble';
+                const size = Math.random() * 30 + 10;
+                bubble.style.width = `${size}px`;
+                bubble.style.height = `${size}px`;
+                bubble.style.left = `${Math.random() * 100}%`;
+                bubble.style.animationDuration = `${Math.random() * 8 + 6}s`;
+                bubble.style.animationDelay = `${Math.random() * 4}s`;
+                container.appendChild(bubble);
+            }
+        }
+
+        // 選擇關卡
+        function selectLevel(lvl) {
+            currentLevel = lvl;
+            currentQuestionIdx = 0;
+
+            // 更新 UI 關卡按鈕狀態
+            for (let i = 1; i <= 4; i++) {
+                const btn = document.getElementById(`lvl-btn-${i}`);
+                if (i === lvl) {
+                    btn.className = "lvl-btn p-3 rounded-2xl border-4 text-left transition transform active:scale-95 flex flex-col gap-1 bg-sky-50 border-sky-400 text-sky-900 shadow-lg scale-105";
+                } else {
+                    btn.className = "lvl-btn p-3 rounded-2xl border-4 text-left transition transform active:scale-95 flex flex-col gap-1 bg-slate-100 border-slate-300 text-slate-600 opacity-80";
+                }
+            }
+
+            loadQuestion();
+        }
+
+        // 載入當前題目
+        function loadQuestion() {
+            const levelData = gameLevels[currentLevel];
+            const q = levelData.questions[currentQuestionIdx];
+
+            currentNum1 = q.num1;
+            currentNum2 = q.num2;
+            currentStep = 'one';
+            carryFromOne = 0;
+            carryFromTen = 0;
+
+            // 更新題目文字與圖示
+            document.getElementById('level-title-tag').innerText = levelData.name.split('：')[0];
+            document.getElementById('aquarium-icon').innerText = levelData.badge;
+            document.getElementById('story-text').innerText = q.story;
+            document.getElementById('horizontal-equation').innerText = `${currentNum1} + ${currentNum2} = ?`;
+
+            // 將數字拆解填入直式對照表
+            const d1 = splitDigits(currentNum1);
+            const d2 = splitDigits(currentNum2);
+
+            document.getElementById('num1-hundred').innerText = d1.hundred;
+            document.getElementById('num1-ten').innerText = d1.ten;
+            document.getElementById('num1-one').innerText = d1.one;
+
+            document.getElementById('num2-hundred').innerText = d2.hundred;
+            document.getElementById('num2-ten').innerText = d2.ten;
+            document.getElementById('num2-one').innerText = d2.one;
+
+            // 重設進位標籤
+            document.getElementById('carry-ten-tag').classList.add('hidden');
+            document.getElementById('carry-hundred-tag').classList.add('hidden');
+
+            // 重設答案欄位
+            ['one', 'ten', 'hundred'].forEach(col => {
+                const input = document.getElementById(`ans-${col}`);
+                input.value = '';
+                input.disabled = (col !== 'one');
+            });
+
+            // 清空積木
+            resetBlocks();
+            updateStepHighlighting();
+
+            const promptMsg = `新題目：${q.story} 請先計個位數！`;
+            document.getElementById('feedback-message').innerText = promptMsg;
+            speak(promptMsg);
+        }
+
+        // 數字拆解成百、十、個位
+        function splitDigits(num) {
+            const str = String(num).padStart(3, '0');
+            return {
+                hundred: parseInt(str[0]),
+                ten: parseInt(str[1]),
+                one: parseInt(str[2])
+            };
+        }
+
+        /* ------------------------------------------------------------------
+         * 4. 積木放置與對應邏輯 (SEN 視覺化 Manipulative)
+         * ------------------------------------------------------------------ */
+        function addBlock(type) {
+            userBlocks[type]++;
+            renderBlocks(type);
+            playSound('pop');
+        }
+
+        function removeBlock(type) {
+            if (userBlocks[type] > 0) {
+                userBlocks[type]--;
+                renderBlocks(type);
+                playSound('pop');
+            }
+        }
+
+        function renderBlocks(type) {
+            const container = document.getElementById(`container-${type}`);
+            const countLabel = document.getElementById(`count-${type}`);
+            container.innerHTML = '';
+
+            const count = userBlocks[type];
+            countLabel.innerText = `${count} 個`;
+
+            for (let i = 0; i < count; i++) {
+                const block = document.createElement('div');
+                block.onclick = (e) => { e.stopPropagation(); removeBlock(type); };
+                block.className = 'cursor-pointer transition transform hover:scale-110 active:scale-95';
+
+                if (type === 'hundred') {
+                    block.className += ' block-hundred w-12 h-12 shadow';
+                    // 10x10 小小格
+                    for (let j = 0; j < 100; j++) {
+                        block.appendChild(document.createElement('div'));
+                    }
+                } else if (type === 'ten') {
+                    block.className += ' block-ten w-5 h-16 shadow';
+                    for (let j = 0; j < 10; j++) {
+                        block.appendChild(document.createElement('div'));
+                    }
+                } else if (type === 'one') {
+                    block.className += ' block-one w-6 h-6';
+                }
+                container.appendChild(block);
+            }
+        }
+
+        function resetBlocks() {
+            userBlocks = { hundred: 0, ten: 0, one: 0 };
+            renderBlocks('hundred');
+            renderBlocks('ten');
+            renderBlocks('one');
+        }
+
+        // 自動排列出正解的積木量 (學習輔助)
+        function autoFillBlocks() {
+            const total = currentNum1 + currentNum2;
+            const digits = splitDigits(total);
+            userBlocks.hundred = digits.hundred;
+            userBlocks.ten = digits.ten;
+            userBlocks.one = digits.one;
+            renderBlocks('hundred');
+            renderBlocks('ten');
+            renderBlocks('one');
+            playSound('correct');
+            speak("已經為你擺好對應的數條與積木囉！");
+        }
+
+        // Drag and Drop 支援
+        function allowDrop(ev) { ev.preventDefault(); }
+        function handleDrop(ev, targetType) {
+            ev.preventDefault();
+            addBlock(targetType);
+        }
+
+        /* ------------------------------------------------------------------
+         * 5. 直式計算與「滿十進一」步驟控制 (Step-by-Step Guidance)
+         * ------------------------------------------------------------------ */
+        function handleInputFocus(col) {
+            if (col === currentStep) return;
+            // SEN 友善提醒：點擊非當前步驟欄位時提示
+            const orderNames = { 'one': '個位', 'ten': '十位', 'hundred': '百位' };
+            const msg = `照順序來！現在應該要先算【${orderNames[currentStep]}】喔！`;
+            document.getElementById('feedback-message').innerText = msg;
+            speak(msg);
+        }
+
+        function pressNum(num) {
+            if (currentStep === 'completed') return;
+            const input = document.getElementById(`ans-${currentStep}`);
+            input.value = num;
+            playSound('pop');
+        }
+
+        function clearCurrentInput() {
+            if (currentStep === 'completed') return;
+            document.getElementById(`ans-${currentStep}`).value = '';
+        }
+
+        function updateStepHighlighting() {
+            // 清除所有高亮
+            ['one', 'ten', 'hundred'].forEach(col => {
+                const box = document.getElementById(`col-ans-${col}`);
+                box.classList.remove('active-column-highlight', 'bg-blue-100', 'bg-amber-100', 'bg-rose-100');
+            });
+
+            const stepText = document.getElementById('current-target-text');
+
+            if (currentStep === 'one') {
+                document.getElementById('col-ans-one').classList.add('active-column-highlight', 'bg-blue-100');
+                document.getElementById('ans-one').disabled = false;
+                stepText.innerText = '正在計算：個位 (先計個位)';
+            } else if (currentStep === 'ten') {
+                document.getElementById('col-ans-ten').classList.add('active-column-highlight', 'bg-amber-100');
+                document.getElementById('ans-ten').disabled = false;
+                stepText.innerText = '正在計算：十位 (再計十位)';
+            } else if (currentStep === 'hundred') {
+                document.getElementById('col-ans-hundred').classList.add('active-column-highlight', 'bg-rose-100');
+                document.getElementById('ans-hundred').disabled = false;
+                stepText.innerText = '正在計算：百位 (最後計百位)';
+            } else {
+                stepText.innerText = '全題計算完成！';
+                document.getElementById('step-indicator').innerText = '任務達成！恭喜！';
+            }
+        }
+
+        // 驗證當前欄位答案
+        function verifyStep() {
+            if (currentStep === 'completed') return;
+
+            const input = document.getElementById(`ans-${currentStep}`);
+            const userVal = parseInt(input.value);
+
+            if (isNaN(userVal)) {
+                const msg = "請點擊下方數字鍵盤填寫答案！";
+                document.getElementById('feedback-message').innerText = msg;
+                speak(msg);
+                return;
+            }
+
+            const d1 = splitDigits(currentNum1);
+            const d2 = splitDigits(currentNum2);
+
+            if (currentStep === 'one') {
+                const sumOne = d1.one + d2.one;
+                const correctDigit = sumOne % 10;
+                const needCarry = sumOne >= 10;
+
+                if (userVal === correctDigit) {
+                    playSound('correct');
+                    if (needCarry) {
+                        carryFromOne = 1;
+                        triggerCarryAnimation('ten');
+                        const msg = "太棒了！個位滿 10 個藍塊，滿十進一！標上 +1 標籤囉！";
+                        document.getElementById('feedback-message').innerText = msg;
+                        speak(msg);
+                    } else {
+                        const msg = "答對了！個位不需要進位。接下來請算十位！";
+                        document.getElementById('feedback-message').innerText = msg;
+                        speak(msg);
+                    }
+                    // 進入十位
+                    currentStep = 'ten';
+                    updateStepHighlighting();
+                } else {
+                    playSound('wrong');
+                    const msg = `再試一次喔！數數看個位小藍塊，${d1.one} 加 ${d2.one} 是多少？`;
+                    document.getElementById('feedback-message').innerText = msg;
+                    speak(msg);
+                }
+
+            } else if (currentStep === 'ten') {
+                const sumTen = d1.ten + d2.ten + carryFromOne;
+                const correctDigit = sumTen % 10;
+                const needCarry = sumTen >= 10;
+
+                if (userVal === correctDigit) {
+                    playSound('correct');
+                    if (needCarry) {
+                        carryFromTen = 1;
+                        triggerCarryAnimation('hundred');
+                        const msg = "太厲害了！十位滿 10 個黃條，滿十進一，進位到百位！";
+                        document.getElementById('feedback-message').innerText = msg;
+                        speak(msg);
+                    } else {
+                        const msg = "十位計算正確！最後讓我們來計算百位！";
+                        document.getElementById('feedback-message').innerText = msg;
+                        speak(msg);
+                    }
+                    // 進入百位
+                    currentStep = 'hundred';
+                    updateStepHighlighting();
+                } else {
+                    playSound('wrong');
+                    let hintStr = `${d1.ten} 加 ${d2.ten}`;
+                    if (carryFromOne > 0) hintStr += "，再加上剛才進位的 1";
+                    const msg = `再算算看！十位是 ${hintStr} 喔！`;
+                    document.getElementById('feedback-message').innerText = msg;
+                    speak(msg);
+                }
+
+            } else if (currentStep === 'hundred') {
+                const sumHundred = d1.hundred + d2.hundred + carryFromTen;
+                const correctDigit = sumHundred;
+
+                if (userVal === correctDigit) {
+                    playSound('win');
+                    currentStep = 'completed';
+                    updateStepHighlighting();
+                    const finalTotal = currentNum1 + currentNum2;
+                    const msg = `恭喜你！完全算對了！答案就是 ${finalTotal}！獲得水族館獎章！`;
+                    document.getElementById('feedback-message').innerText = msg;
+                    speak(msg);
+
+                    // 解鎖勳章
+                    unlockMedal(currentLevel);
+                } else {
+                    playSound('wrong');
+                    let hintStr = `${d1.hundred} 加 ${d2.hundred}`;
+                    if (carryFromTen > 0) hintStr += "，再加上進位的 1";
+                    const msg = `百位再檢查看看！是 ${hintStr} 喔！`;
+                    document.getElementById('feedback-message').innerText = msg;
+                    speak(msg);
+                }
+            }
+        }
+
+        // 滿十進一飛行動畫發射 (+1 Tag)
+        function triggerCarryAnimation(targetCol) {
+            playSound('carry');
+            const carryTag = document.getElementById(`carry-${targetCol}-tag`);
+            carryTag.classList.remove('hidden');
+            
+            // 彈跳動畫視覺補強
+            carryTag.style.animation = 'none';
+            setTimeout(() => {
+                carryTag.style.animation = '';
+            }, 10);
+        }
+
+        // 提示 Hint 功能
+        function giveHint() {
+            playSound('pop');
+            const d1 = splitDigits(currentNum1);
+            const d2 = splitDigits(currentNum2);
+
+            let hintText = "";
+            if (currentStep === 'one') {
+                hintText = `提示：請算個位！個位是 ${d1.one} + ${d2.one}。`;
+            } else if (currentStep === 'ten') {
+                hintText = `提示：請算十位！十位是 ${d1.ten} + ${d2.ten}` + (carryFromOne ? " 再加進位 1。" : "。");
+            } else if (currentStep === 'hundred') {
+                hintText = `提示：請算百位！百位是 ${d1.hundred} + ${d2.hundred}` + (carryFromTen ? " 再加進位 1。" : "。");
+            }
+            document.getElementById('feedback-message').innerText = hintText;
+            speak(hintText);
+        }
+
+        // 下一題 / 下一關
+        function nextQuestion() {
+            const levelQuestions = gameLevels[currentLevel].questions;
+            if (currentQuestionIdx < levelQuestions.length - 1) {
+                currentQuestionIdx++;
+                loadQuestion();
+            } else {
+                // 關卡完成
+                if (currentLevel < 4) {
+                    const msg = `恭喜完成【${gameLevels[currentLevel].name}】！為你解鎖下一個冒險關卡！`;
+                    alert(msg);
+                    selectLevel(currentLevel + 1);
+                } else {
+                    speak("太神奇了！你已經通過了水族館所有的三位數加法大考驗！你是數學王者！");
+                    openMedalModal();
+                }
+            }
+        }
+
+        /* ------------------------------------------------------------------
+         * 6. 水族館勳章系統 Modal
+         * ------------------------------------------------------------------ */
+        function unlockMedal(lvl) {
+            unlockedMedals[lvl - 1] = true;
+            const count = unlockedMedals.filter(Boolean).length;
+            document.getElementById('medal-count-badge').innerText = `${count}/4`;
+
+            const card = document.getElementById(`medal-card-${lvl}`);
+            if (card) {
+                card.classList.remove('opacity-40');
+                card.classList.add('bg-amber-50', 'border-amber-400', 'shadow-md');
+            }
+        }
+
+        function openMedalModal() {
+            playSound('pop');
+            document.getElementById('medal-modal').classList.remove('hidden');
+        }
+
+        function closeMedalModal() {
+            document.getElementById('medal-modal').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
